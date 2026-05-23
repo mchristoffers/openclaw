@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
   sync:
@@ -21,5 +22,31 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git remote add upstream https://github.com/openclaw/openclaw.git
           git fetch upstream
-          git merge upstream/main --no-edit || echo "Merge conflict - manual resolution needed"
+          if ! git merge upstream/main --no-edit; then
+            git merge --abort
+            echo "CONFLICT=true" >> $GITHUB_ENV
+          fi
+      - name: Push changes
+        if: env.CONFLICT != 'true'
+        run: git push
+      - name: Open issue on conflict
+        if: env.CONFLICT == 'true'
+        run: |
+          existing=$(gh issue list --label "sync-conflict" --state open --json number --jq 'length')
+          if [ "$existing" = "0" ]; then
+            gh issue create \
+              --title "Fork sync conflict with upstream" \
+              --label "sync-conflict" \
+              --body "Automatic sync from `openclaw/openclaw` failed due to a merge conflict on \`main\`.
+
+          **To resolve:**
+          \`\`\`bash
+          git remote add upstream https://github.com/openclaw/openclaw.git
+          git fetch upstream
+          git merge upstream/main
+          # fix conflicts
           git push
+          \`\`\`"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
