@@ -3,50 +3,9 @@ on:
   schedule:
     - cron: '0 */6 * * *'
   workflow_dispatch:
-
-permissions:
-  contents: write
-  issues: write
-
 jobs:
   sync:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Sync upstream
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git remote add upstream https://github.com/openclaw/openclaw.git
-          git fetch upstream
-          if ! git merge upstream/main --no-edit; then
-            git merge --abort
-            echo "CONFLICT=true" >> $GITHUB_ENV
-          fi
-      - name: Push changes
-        if: env.CONFLICT != 'true'
-        run: git push
-      - name: Open issue on conflict
-        if: env.CONFLICT == 'true'
-        run: |
-          existing=$(gh issue list --label "sync-conflict" --state open --json number --jq 'length')
-          if [ "$existing" = "0" ]; then
-            gh issue create \
-              --title "Fork sync conflict with upstream" \
-              --label "sync-conflict" \
-              --body "Automatic sync from `openclaw/openclaw` failed due to a merge conflict on \`main\`.
-
-          **To resolve:**
-          \`\`\`bash
-          git remote add upstream https://github.com/openclaw/openclaw.git
-          git fetch upstream
-          git merge upstream/main
-          # fix conflicts
-          git push
-          \`\`\`"
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    uses: mchristoffers/workflows/.github/workflows/sync-fork.yml@main
+    with:
+      upstream: "openclaw/openclaw"
+      branch: "main"
